@@ -209,8 +209,7 @@ def train_dann_krn(cfg, cameraJson, corners3D, device, init_epoch=None):
     target_val_loader    = torch.utils.data.DataLoader(target_val_dataset, batch_size=1, shuffle=False, num_workers=cfg.num_workers, pin_memory=True)
 
     # Optimizer - AdamW
-    # optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.lr)
-    optimizer = torch.optim.SGD(model.parameters(), lr=cfg.lr, momentum=0.9)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=cfg.lr_decay_step, gamma=cfg.lr_decay_alpha)
 
     # Load weights if specified
@@ -231,6 +230,9 @@ def train_dann_krn(cfg, cameraJson, corners3D, device, init_epoch=None):
         # Train KRN for single epoch
         train_dann_single_epoch(epoch, cur_lr, model, source_train_loader, target_train_loader, optimizer, cfg.max_epochs, device)
 
+        # Update LR
+        scheduler.step()
+
         # Save weights
         if (epoch % cfg.save_epoch == 0):
             save_checkpoint(epoch, cfg, model, optimizer)
@@ -238,9 +240,6 @@ def train_dann_krn(cfg, cameraJson, corners3D, device, init_epoch=None):
         # Validate KRN
         if (epoch % cfg.test_epoch == 0):
             val_krn(epoch, cur_lr, model, target_val_loader, corners3D, cameraMatrix, distCoeffs, device)
-
-        # Update LR
-        scheduler.step()
 
     # Final things to do
     save_checkpoint(cfg.max_epochs, cfg, model, optimizer, last=True)
