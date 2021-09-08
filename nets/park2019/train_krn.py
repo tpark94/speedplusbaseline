@@ -112,14 +112,14 @@ def val_krn(epoch, lr, model, dataloader, corners3D, cameraMatrix, distCoeffs, d
 
 def train_krn(cfg, cameraJson, corners3D, device, init_epoch=None):
 
-    with open(cameraJson) as f:
+    with open(cameraJson, 'r') as f:
         cam = json.load(f)
-    cameraMatrix = np.array(cam['K'], dtype=np.float32)
-    distCoeffs   = np.array(cam['dist_coeffs'], dtype=np.float32)
+    cameraMatrix = np.array(cam['cameraMatrix'], dtype=np.float32)
+    distCoeffs   = np.array(cam['distCoeffs'], dtype=np.float32)
 
     # Create KRN
     kpRegressNet = KeypointRegressionNet(11)
-    logging('ODN created. Number of parameters: {}'.format(num_total_parameters(kpRegressNet)))
+    logging('KRN created. Number of parameters: {}'.format(num_total_parameters(kpRegressNet)))
 
     # # Multiple GPUs?
     # if torch.cuda.device_count() > 1:
@@ -153,6 +153,9 @@ def train_krn(cfg, cameraJson, corners3D, device, init_epoch=None):
         # Train KRN for single epoch
         train_krn_single_epoch(epoch, cur_lr, kpRegressNet, train_loader, optimizer, device)
 
+        # Update LR
+        scheduler.step()
+
         # Save weights
         if (epoch % cfg.save_epoch == 0):
             save_checkpoint(epoch, cfg, kpRegressNet, optimizer)
@@ -160,9 +163,6 @@ def train_krn(cfg, cameraJson, corners3D, device, init_epoch=None):
         # Validate KRN
         if (epoch % cfg.test_epoch == 0):
             val_krn(epoch, cur_lr, kpRegressNet, val_loader, corners3D, cameraMatrix, distCoeffs, device)
-
-        # Update LR
-        scheduler.step()
 
     # Save to 'final.pth'
     save_checkpoint(cfg.max_epochs, cfg, kpRegressNet, optimizer, last=True)

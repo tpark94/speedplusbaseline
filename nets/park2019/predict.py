@@ -153,8 +153,6 @@ def predict(odn_dict, krn_dict, cfg, cameraMatrix, distCoeffs=np.zeros((1,5)), d
         errs_spd.update(speed, 1)
         es.append(speed)
 
-        # ADD metric
-
         elapse_t.update((tf-ts)*1000, 1)
 
         report_progress(epoch=1, lr=np.NAN, epoch_iter=i+1, epoch_size=len(csv),
