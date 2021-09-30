@@ -131,7 +131,13 @@ dmypy.json
 
 # Project directories
 checkpoints/
-matlab/
+log/
+figures/
 
 # 3D model
-utils/tangoPoints.mat
+src/utils/tangoPoints.mat
+src/utils/attitudeClasses.mat
+
+# Temporary
+matlab/
+*.sh

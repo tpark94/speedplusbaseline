@@ -35,9 +35,11 @@ import logging
 from scipy.io import loadmat
 
 from cfgs.config import cfg
+from src.styleaug.styleAugmentor import StyleAugmentor
 from src.nets.build     import get_model, get_optimizer
 from src.datasets.build import make_dataloader
-from src.core.dann      import train_dann_single_epoch_krn
+from src.core.trainer   import train_single_epoch_krn, train_single_epoch_spn
+from src.core.inference import valid_krn, valid_spn
 from src.utils.utils    import setup_logger, set_all_seeds, \
                                save_checkpoint, load_checkpoint, \
                                load_tango_3d_keypoints, load_camera_intrinsics
@@ -46,10 +48,6 @@ logger = logging.getLogger(__name__)
 
 def main():
     device = torch.device('cuda:0') if torch.cuda.is_available() and cfg.use_cuda else torch.device('cpu')
-
-    # Make sure dann option is on
-    # DANN only implemented for KRN
-    assert cfg.dann and cfg.model_name=='krn'
 
     # Seeds
     set_all_seeds(2021, cfg, True)
@@ -73,6 +71,13 @@ def main():
     # Pose estimation CNN
     model = get_model(cfg)
 
+    # Style Augmentor
+    styleAugmentor = None
+    if cfg.randomize_texture:
+        styleAugmentor = StyleAugmentor(cfg.texture_alpha, device)
+        logger.info('Texture randomization enabled with alpha = {}'.format(cfg.texture_alpha))
+        logger.info('   - Randomization ratio: {:.2f}'.format(cfg.texture_ratio))
+
     # Optimizer
     optimizer = get_optimizer(cfg, model)
 
@@ -84,8 +89,7 @@ def main():
         best_perf   = begin_epoch
     else:
         begin_epoch = 0
-        last_epoch = -1
-        # best_speed = 1e10
+        # best_perf   = 1e10
         best_perf   = begin_epoch
 
     # Model to device
@@ -104,24 +108,24 @@ def main():
     )
 
     # Dataloader
-    source_train_loader = make_dataloader(cfg, is_train=True,  is_source=True)
-    target_train_loader = make_dataloader(cfg, is_train=True,  is_source=False)
-    target_test_loader  = make_dataloader(cfg, is_train=False, is_source=False)
+    train_loader = make_dataloader(cfg, is_train=True,  is_source=True)
+    test_loader  = make_dataloader(cfg, is_train=False, is_source=False)
 
-    # PnP-related items
+    # Miscellaneous items
     corners3D = load_tango_3d_keypoints(cfg.keypts_3d_model)
     cameraMatrix, distCoeffs = load_camera_intrinsics(
                 osp.join(cfg.dataroot, 'camera.json'))
-
+    attClasses = loadmat('src/utils/attitudeClasses.mat')['qClass'] # [Nclasses x 4]
+    assert attClasses.shape[0] == cfg.num_classes, 'Number of classes not matching.'
 
     # Main loop
     perf    = 1e10
     is_best = False
     for epoch in range(begin_epoch, cfg.max_epochs):
         # Train an epoch
-        eval('train_dann_single_epoch_'+cfg.model_name)(
-                epoch, cfg, model, source_train_loader, target_train_loader,
-                optimizer, writer, device, scaler=scaler)
+        eval('train_single_epoch_'+cfg.model_name)(
+                epoch+1, cfg, model, train_loader, optimizer, writer,
+                device, styleAugmentor=styleAugmentor, scaler=scaler)
 
         # Update LR scheduler
         lr_scheduler.step()
@@ -129,8 +133,8 @@ def main():
         # Test
         if (epoch+1) % cfg.test_epoch == 0 and cfg.test_epoch > 0:
             _, _, speed, _ = eval('valid_'+cfg.model_name)(
-                epoch, cfg, model, target_test_loader,
-                cameraMatrix, distCoeffs, corners3D, writer, device, None)
+                epoch+1, cfg, model, test_loader,
+                cameraMatrix, distCoeffs, corners3D, writer, device, attClasses)
 
         # Best yet?
         perf = epoch+1
