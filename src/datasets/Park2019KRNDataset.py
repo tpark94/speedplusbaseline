@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 class Park2019KRNDataset(Dataset):
     def __init__(self, cfg, transforms=None, is_train=True, is_source=True):
         self.is_train   = is_train
-        self.root       = cfg.dataroot
+        self.root       = osp.join(cfg.dataroot, cfg.dataname)
         self.num_keypts = cfg.num_keypoints
 
         if is_train:

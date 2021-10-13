@@ -3,8 +3,8 @@ import argparse
 PROJROOTDIR = {'mac':  '/Users/taehapark/SLAB/speedplusbaseline',
                'linux': '/media/shared/Jeff/SLAB/speedplusbaseline'}
 
-DATAROOTDIR = {'mac':  '/Users/taehapark/SLAB/speedplus/data/datasets/speedplus',
-               'linux': '/home/jeffpark/SLAB/Dataset/speedplus'}
+DATAROOTDIR = {'mac':  '/Users/taehapark/SLAB/speedplus/data/datasets',
+               'linux': '/home/jeffpark/SLAB/Dataset'}
 
 parser = argparse.ArgumentParser('Configurations for SPEED+ Baseline Study')
 
@@ -12,6 +12,7 @@ parser = argparse.ArgumentParser('Configurations for SPEED+ Baseline Study')
 # Basic directories and names
 parser.add_argument('--projroot', type=str, default=PROJROOTDIR['linux'])
 parser.add_argument('--dataroot', type=str, default=DATAROOTDIR['linux'])
+parser.add_argument('--dataname', type=str, default='speedplus')
 parser.add_argument('--savedir',  type=str, default='checkpoints/synthetic/krn')
 parser.add_argument('--resultfn', type=str, default='synthetic.txt')
 parser.add_argument('--logdir',   type=str, default='log/synthetic/krn')

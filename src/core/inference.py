@@ -27,6 +27,7 @@ from __future__ import print_function
 
 import logging
 import time
+import os.path as osp
 
 import torch
 
@@ -44,6 +45,10 @@ def valid_krn(epoch, cfg, model, data_loader, cameraMatrix, distCoeffs, corners3
     speed_meter     = AverageMeter('-')
     speed_meter_th  = AverageMeter('-')
     acc_meter       = AverageMeter('%')
+
+    err_q_all = []
+    err_t_all = []
+    speed_all = []
 
     # switch to eval mode
     model.eval()
@@ -88,16 +93,43 @@ def valid_krn(epoch, cfg, model, data_loader, cameraMatrix, distCoeffs, corners3
         speed_meter_th.update(speed_mod, B)
         acc_meter.update(acc*100, B)
 
+        # Save
+        err_q_all.append(err_q)
+        err_t_all.append(err_t)
+        speed_all.append(speed_mod)
+
         report_progress(epoch=epoch, lr=np.nan, epoch_iter=idx+1, epoch_size=len(data_loader),
                         time=test_time_meter, is_train=False, eT=err_t_meter, eR=err_q_meter,
                         speed=speed_meter, acc=acc_meter)
 
-    # log
+    # log to Tensorboard
     if writer is not None:
         writer.add_scalar('Valid/err_q [deg]', err_q_meter.avg, epoch)
         writer.add_scalar('Valid/err_t [m]',   err_t_meter.avg, epoch)
         writer.add_scalar('Valid/speed (raw) [-]', speed_meter.avg, epoch)
         writer.add_scalar('Valid/speed (thr) [-]', speed_meter_th.avg, epoch)
+
+    # Write overall results
+    writefn = osp.join(cfg.logdir, cfg.resultfn)
+    with open(writefn, 'w') as f:
+        f.write('eR:          {:.5f} [deg]\n'.format(err_q_meter.avg))
+        f.write('eT:          {:.5f} [m]\n'.format(err_t_meter.avg))
+        f.write('speed (raw): {:.5f} [-]\n'.format(speed_meter.avg))
+        f.write('speed (thr): {:.5f} [-]\n'.format(speed_meter_th.avg))
+    logger.info('Test results written to {}'.format(writefn))
+
+    # Write performances for each items
+    with open(osp.join(cfg.logdir, 'err_q.txt'), 'w') as f:
+        for eq in err_q_all:
+            f.write('{:.5f}\n'.format(eq))
+
+    with open(osp.join(cfg.logdir, 'err_t.txt'), 'w') as f:
+        for et in err_t_all:
+            f.write('{:.5f}\n'.format(et))
+
+    with open(osp.join(cfg.logdir, 'speed.txt'), 'w') as f:
+        for spd in speed_all:
+            f.write('{:.5f}\n'.format(spd))
 
     return err_q_meter.avg, err_t_meter.avg, speed_meter.avg, speed_meter_th.avg
 

@@ -26,6 +26,7 @@ from __future__ import division
 from __future__ import print_function
 
 import torch
+import os
 import os.path as osp
 import logging
 from scipy.io import loadmat
@@ -43,8 +44,7 @@ def main():
 
     # Logger & Output directory
     setup_logger('test')
-    writefn = osp.join(cfg.logdir, cfg.resultfn)
-    logger.info('Test results will be written to {}'.format(writefn))
+    if not osp.exists(cfg.logdir): os.makedirs(cfg.logdir)
 
     # Pose estimation CNN
     model = get_model(cfg)
@@ -62,7 +62,7 @@ def main():
     # PnP-related items
     corners3D = load_tango_3d_keypoints(cfg.keypts_3d_model)
     cameraMatrix, distCoeffs = load_camera_intrinsics(
-                osp.join(cfg.dataroot, 'camera.json'))
+                osp.join(cfg.dataroot, cfg.dataname, 'camera.json'))
     attClasses = loadmat('src/utils/attitudeClasses.mat')['qClass'] # [Nclasses x 4]
     assert attClasses.shape[0] == cfg.num_classes, 'Number of classes not matching.'
 
@@ -71,25 +71,15 @@ def main():
         0, cfg, model, test_loader,
         cameraMatrix, distCoeffs, corners3D, None, device, attClasses)
 
-    # Write the result
-    with open(writefn, 'w') as f:
-        f.write('eR:          {:.5f} [deg]\n'.format(eR))
-        # ! TEMP
-        if cfg.model_name == 'krn':
-            f.write('eT:          {:.5f} [m]\n'.format(eT))
-            f.write('speed (raw): {:.5f} [-]\n'.format(speed_raw))
-            f.write('speed (thr): {:.5f} [-]\n'.format(speed_mod))
-    logger.info('Results written to {}'.format(writefn))
+    # # ! Temporary: Write the attitude predictions to a file
+    # writefn = osp.join(cfg.logdir, 'attitudes_{}.txt'.format(cfg.test_domain))
+    # if cfg.model_name == 'spn':
+    #     q_all = eT
 
-    # ! Temporary: Write the attitude predictions to a file
-    writefn = osp.join(cfg.logdir, 'attitudes_{}.txt'.format(cfg.test_domain))
-    if cfg.model_name == 'spn':
-        q_all = eT
-
-        with open(writefn, 'w') as f:
-            for i in range(len(q_all)):
-                f.write(' '.join(str(item) for item in q_all[i]))
-                f.write('\n')
+    #     with open(writefn, 'w') as f:
+    #         for i in range(len(q_all)):
+    #             f.write(' '.join(str(item) for item in q_all[i]))
+    #             f.write('\n')
 
 if __name__=='__main__':
     main()
