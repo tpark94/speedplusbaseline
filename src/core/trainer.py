@@ -36,9 +36,10 @@ from src.nets.spn        import softmax_cross_entropy_with_logits
 from src.utils.utils     import AverageMeter, report_progress
 from src.utils.visualize import imshow, plot_2D_bbox, scatter_keypoints
 
+logger = logging.getLogger("Training")
+
 def train_single_epoch_krn(epoch, cfg, model, data_loader, optimizer,
                        writer, device, styleAugmentor=None, scaler=None):
-    # logger = logging.getLogger("Training")
     training_time_meter = AverageMeter('ms')
     loss_x_meter = AverageMeter('-')
     loss_y_meter = AverageMeter('-')
@@ -57,7 +58,7 @@ def train_single_epoch_krn(epoch, cfg, model, data_loader, optimizer,
 
         # Debug (uncomment)
         # imshow(images[0])
-        # scatter_keypoints(images[0], target[0,:,0], target[0,:,1], True)
+        # scatter_keypoints(images[0], target[0,0], target[0,1], True)
 
         # To device
         images = images.to(device)
@@ -96,23 +97,22 @@ def train_single_epoch_krn(epoch, cfg, model, data_loader, optimizer,
             clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
 
-        # measure elapsed time & loss
+        # measure elapsed time & record loss
         training_time_meter.update((time.time() - start)*1000, B)
         loss_x_meter.update(summary['loss_x'], B)
         loss_y_meter.update(summary['loss_y'], B)
 
-        # report progress
+        # report training progress
         report_progress(epoch=epoch, lr=lr, epoch_iter=idx+1, epoch_size=len(data_loader),
                         time=training_time_meter, is_train=True, loss_x=loss_x_meter, loss_y=loss_y_meter)
 
-    # log
+    # log to tensorboard
     if writer is not None:
         writer.add_scalar('train/loss_x', loss_x_meter.avg, epoch)
         writer.add_scalar('train/loss_y', loss_y_meter.avg, epoch)
 
 def train_single_epoch_spn(epoch, cfg, model, data_loader, optimizer,
                        writer, device, styleAugmentor=None, scaler=None):
-    # logger = logging.getLogger("Training")
     training_time_meter = AverageMeter('ms')
     loss_class_meter  = AverageMeter('-')
     loss_weight_meter = AverageMeter('-')
@@ -189,11 +189,11 @@ def train_single_epoch_spn(epoch, cfg, model, data_loader, optimizer,
         loss_class_meter.update(float(loss_class.detach().cpu()), B)
         loss_weight_meter.update(float(loss_regress.detach().cpu()), B)
 
-        # report progress
+        # report training progress
         report_progress(epoch=epoch, lr=lr, epoch_iter=idx+1, epoch_size=len(data_loader),
                         time=training_time_meter, is_train=True, loss_c=loss_class_meter, loss_r=loss_weight_meter)
 
-    # log
+    # log to tensorboard
     if writer is not None:
         writer.add_scalar('train/loss_c', loss_class_meter.avg, epoch)
         writer.add_scalar('train/loss_r', loss_weight_meter.avg, epoch)

@@ -29,7 +29,9 @@ import torch
 import torch.nn as nn
 
 from .park2019 import KeypointRegressionNet
-from .spn      import SpacecraftPoseNet
+
+#! Custom autograd function below must be modified to work with PyTorch autocast 
+#! (for mixed-precision learning). For now, disable autocast when performing DANN.
 
 class GradientReversalFunction(torch.autograd.Function):
     """
@@ -37,50 +39,49 @@ class GradientReversalFunction(torch.autograd.Function):
     Unsupervised Domain Adaptation by Backpropagation (Ganin & Lempitsky, 2015)
     Forward pass is the identity function. In the backward pass,
     the upstream gradients are multiplied by -lambda (i.e. gradient is reversed)
+
+    This class is forked from the following repo:
+    https://github.com/jvanvugt/pytorch-domain-adaptation/blob/master/utils.py
     """
     @staticmethod
-    def forward(ctx, x, alpha):
-        ctx.alpha = alpha
-
-        return x.view_as(x)
+    def forward(ctx, x, lambda_):
+        ctx.lambda_ = lambda_
+        return x.clone()
 
     @staticmethod
-    def backward(ctx, grad_output):
-        output = grad_output.neg() * ctx.alpha
-        return output, None
+    def backward(ctx, grads):
+        lambda_ = ctx.lambda_
+        lambda_ = grads.new_tensor(lambda_)
+        dx = -lambda_ * grads
+        return dx, None
 
 class RevGrad(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, num_keypoints):
         super(RevGrad, self).__init__()
 
         # DANN only applied to KRN
-        assert cfg.model_name == 'krn'
-
         # Net (Feature extractor + pose estimation network)
-        self.net = KeypointRegressionNet(cfg.num_keypoints)
+        self.net = KeypointRegressionNet(num_keypoints)
 
         # Forward hook after feature extractor
-        self.feature = torch.empty(0)
         def return_output(module, input, output):
             self.feature = output
 
         # Attach hook
         self.net.base[-1].register_forward_hook(return_output)
 
-        # Domain classifier - follow the MobileNetv2 architecture
+        # Domain classifier
         # Output of feature extractor: [B x 320 x 7 x 7]
         self.domain_classifier = nn.Sequential(
             nn.Conv2d(320, 1280, 1, stride=1, padding=0, bias=True),
             nn.ReLU(inplace=True),
-            nn.Conv2d(1280, 2, 7, bias=True),
-            nn.LogSoftmax(dim=1)
+            nn.AvgPool2d(7),
+            nn.Conv2d(1280, 1, 1)
         )
-
 
     def forward(self, x, y=None, alpha=None):
         if y is not None:
             # Training: {loss, sm} - KRN
-            #           {classes, weights} : SPN
             out1 = self.net(x, y)
         else:
             # Test: {xc, yc} or bbox - KRN

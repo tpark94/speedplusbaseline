@@ -31,11 +31,11 @@ import os.path as osp
 import logging
 from scipy.io import loadmat
 
-from cfgs.config import cfg
+from config import cfg
 from src.nets.build     import get_model
 from src.datasets.build import make_dataloader
 from src.core.inference import valid_krn, valid_spn
-from src.utils.utils    import setup_logger, load_tango_3d_keypoints, load_camera_intrinsics
+from src.utils.utils    import set_all_seeds, setup_logger, load_tango_3d_keypoints, load_camera_intrinsics
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +45,10 @@ def main():
     # Logger & Output directory
     setup_logger('test')
     if not osp.exists(cfg.logdir): os.makedirs(cfg.logdir)
+
+    # Seeds
+    logger.info('Random seed value: {}'.format(cfg.seed))
+    set_all_seeds(cfg.seed, cfg, True)
 
     # Pose estimation CNN
     model = get_model(cfg)
@@ -59,27 +63,30 @@ def main():
 
     model = model.to(device)
 
-    # PnP-related items
+    # Load other tems
     corners3D = load_tango_3d_keypoints(cfg.keypts_3d_model)
     cameraMatrix, distCoeffs = load_camera_intrinsics(
                 osp.join(cfg.dataroot, cfg.dataname, 'camera.json'))
-    attClasses = loadmat('src/utils/attitudeClasses.mat')['qClass'] # [Nclasses x 4]
+    attClasses = loadmat(cfg.attitude_class)['qClass'] # [Nclasses x 4]
     assert attClasses.shape[0] == cfg.num_classes, 'Number of classes not matching.'
 
-    # Main loop
-    eR, eT, speed_raw, speed_mod = eval('valid_'+cfg.model_name)(
+    # Main testing loop
+    performances = eval('valid_'+cfg.model_name)(
         0, cfg, model, test_loader,
         cameraMatrix, distCoeffs, corners3D, None, device, attClasses)
 
-    # # ! Temporary: Write the attitude predictions to a file
-    # writefn = osp.join(cfg.logdir, 'attitudes_{}.txt'.format(cfg.test_domain))
-    # if cfg.model_name == 'spn':
-    #     q_all = eT
+    # Write average performances to file
+    try:
+        writefn = osp.join(cfg.logdir, cfg.resultfn)
+        with open(writefn, 'w') as f:
+            for metric in performances:
+                msg = metric + ': {:.5f} [' + performances[metric].unit + ']\n'
+                f.write(msg.format(performances[metric].avg))
+            logger.info('Test results written to {}'.format(writefn))
+    except:
+        logger.info('WARNING! Failed to write test results to {}'.format(writefn))
+        pass
 
-    #     with open(writefn, 'w') as f:
-    #         for i in range(len(q_all)):
-    #             f.write(' '.join(str(item) for item in q_all[i]))
-    #             f.write('\n')
 
 if __name__=='__main__':
     main()

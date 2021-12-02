@@ -145,8 +145,8 @@ class KeypointRegressionNet(nn.Module):
 
         if y is not None:
             # TRAINING
-            txc = y[:,:,0]
-            tyc = y[:,:,1]
+            txc = y[:,0]
+            tyc = y[:,1]
 
             # Loss
             loss_x, loss_y = 0.0, 0.0

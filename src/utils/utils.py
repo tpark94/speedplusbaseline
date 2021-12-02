@@ -137,23 +137,41 @@ def load_checkpoint(checkpoint_file, model, optimizer, device):
 # -----------------------------------------------------------------------
 # Functions regarding 3D keypoints projection
 def weighted_mean_quaternion(qs, weights=None):
+    ''' Compute weighted mean of N unit quaternions.
+    Arguments:
+        qs: (N, 4) or (4, N) numpy.ndarray - unit quaternions (scalar-first)
+    Returns:
+        q: (4,) numpy.ndarray - weighted mean unit quaternion (scalar-first)
+    '''
+    # Size check
     if qs.shape[1] != 4:
-        qs = np.transpose(qs) # [N x 4]
+        qs = np.transpose(qs) # (N,4)
+
+    # Scipy uses scalar-last convention
+    qs = qs[:,[1,2,3,0]]
 
     # Weights?
     if weights is None:
         weights = np.ones((qs.shape[0],), dtype=np.float32)
 
-    # To R
+    # Quaternions to rotation matrices
     Rs = R.from_quat(qs)
 
     # Weighted average
-    q = Rs.mean(weights).as_quat() # [1 x 4]
+    q = Rs.mean(weights).as_quat() # (4,)
+
+    # Back to scalar-first convention
+    q = q[[3,0,1,2]]
 
     return q
 
 def quat2dcm(q):
-    """ Computing direction cosine matrix from quaternion, adapted from PyNav. """
+    """ Computing direction cosine matrix from quaternion, adapted from PyNav. 
+    Arguments:
+        q: (4,) numpy.ndarray - unit quaternion (scalar-first)
+    Returns:
+        dcm: (3,3) numpy.ndarray - corresponding DCM
+    """
 
     # normalizing quaternion
     q = q/np.linalg.norm(q)
@@ -180,15 +198,18 @@ def quat2dcm(q):
 
     return dcm
 
-def project_keypoints(q, r, K, dist, keypoints):
-    """ Projecting 3D keypoints to 2D
-        q: quaternion (np.array)
-        r: position   (np.array)
-        K: camera intrinsic (3,3) (np.array)
-        dist: distortion coefficients (5,) (np.array)
-        keypoints: N x 3 or 3 x N (np.array)
-    """
-    # Make sure keypoints are 3 x N
+def project_keypoints(q_vbs2tango, r_Vo2To_vbs, cameraMatrix, distCoeffs, keypoints):
+    ''' Project keypoints.
+    Arguments:
+        q_vbs2tango:  (4,) numpy.ndarray - unit quaternion from VBS to Tango frame
+        r_Vo2To_vbs:  (3,) numpy.ndarray - position vector from VBS to Tango in VBS frame (m)
+        cameraMatrix: (3,3) numpy.ndarray - camera intrinsics matrix
+        distCoeffs:   (5,) numpy.ndarray - camera distortion coefficients in OpenCV convention
+        keypoints:    (3,N) or (N,3) numpy.ndarray - 3D keypoint locations (m)
+    Returns:
+        points2D: (2,N) numpy.ndarray - projected points (pix)
+    '''
+    # Size check (3,N)
     if keypoints.shape[0] != 3:
         keypoints = np.transpose(keypoints)
 
@@ -196,22 +217,33 @@ def project_keypoints(q, r, K, dist, keypoints):
     keypoints = np.vstack((keypoints, np.ones((1, keypoints.shape[1]))))
 
     # transformation to image frame
-    pose_mat = np.hstack((np.transpose(quat2dcm(q)), np.expand_dims(r, 1)))
+    pose_mat = np.hstack((np.transpose(quat2dcm(q_vbs2tango)),
+                          np.expand_dims(r_Vo2To_vbs, 1)))
     xyz      = np.dot(pose_mat, keypoints) # [3 x N]
     x0, y0   = xyz[0,:] / xyz[2,:], xyz[1,:] / xyz[2,:] # [1 x N] each
 
     # apply distortion
     r2 = x0*x0 + y0*y0
-    cdist = 1 + dist[0]*r2 + dist[1]*r2*r2 + dist[4]*r2*r2*r2
-    x  = x0*cdist + dist[2]*2*x0*y0 + dist[3]*(r2 + 2*x0*x0)
-    y  = y0*cdist + dist[2]*(r2 + 2*y0*y0) + dist[3]*2*x0*y0
+    cdist = 1 + distCoeffs[0]*r2 + distCoeffs[1]*r2*r2 + distCoeffs[4]*r2*r2*r2
+    x  = x0*cdist + distCoeffs[2]*2*x0*y0 + distCoeffs[3]*(r2 + 2*x0*x0)
+    y  = y0*cdist + distCoeffs[2]*(r2 + 2*y0*y0) + distCoeffs[3]*2*x0*y0
 
     # apply camera matrix
-    points2D = np.vstack((K[0,0]*x + K[0,2], K[1,1]*y + K[1,2]))
+    points2D = np.vstack((cameraMatrix[0,0]*x + cameraMatrix[0,2],
+                          cameraMatrix[1,1]*y + cameraMatrix[1,2]))
 
     return points2D
 
 def pnp(points_3D, points_2D, cameraMatrix, distCoeffs=None, rvec=None, tvec=None, useExtrinsicGuess=False):
+    ''' Perform EPnP using OpenCV.
+    Arguments:
+        points_3D:  (N,3) numpy.ndarray - 3D coordinates
+        points_2D:  (N,2) numpy.ndarray - 2D coordinates
+        ...
+    Returns:
+        q_pr: (4,) numpy.ndarray - unit quaternion (scalar-first)
+        t_pr: (3,) numpy.ndarray - position vector (m)
+    '''
     if distCoeffs is None:
         distCoeffs = np.zeros((5, 1), dtype=np.float32)
 
@@ -228,15 +260,19 @@ def pnp(points_3D, points_2D, cameraMatrix, distCoeffs=None, rvec=None, tvec=Non
 
     R_pr, _ = cv2.Rodrigues(R_exp)
 
-    q = R.from_matrix(R_pr).as_quat() # [qvec, qcos]
+    # Rotation matrix to quaternion
+    q_pr = R.from_matrix(np.squeeze(R_pr)).as_quat()
 
-    return q, np.squeeze(t)
+    # Convert to scalar-first
+    q_pr = q_pr[[3,0,1,2]]
+
+    return q_pr, np.squeeze(t)
 
 # -----------------------------------------------------------------------
 # Functions regarding 3D model loading
 def load_tango_3d_keypoints(mat_dir):
-    vertices  = loadmat(mat_dir)['tango3Dpoints_refined'] # [3 x 11]
-    corners3D = np.transpose(np.array(vertices, dtype=np.float32))
+    vertices  = loadmat(mat_dir)['tango3Dpoints'] # [3 x 11]
+    corners3D = np.transpose(np.array(vertices, dtype=np.float32)) # [11 x 3]
 
     return corners3D
 
@@ -244,7 +280,7 @@ def load_camera_intrinsics(camera_json):
     with open(camera_json) as f:
         cam = json.load(f)
     cameraMatrix = np.array(cam['cameraMatrix'], dtype=np.float32)
-    distCoeffs   = np.array(cam['distCoeffs'], dtype=np.float32)
+    distCoeffs   = np.array(cam['distCoeffs'],   dtype=np.float32)
 
     return cameraMatrix, distCoeffs
 

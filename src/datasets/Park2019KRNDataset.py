@@ -29,8 +29,9 @@ import os.path as osp
 import logging
 import numpy as np
 import pandas as pd
-import cv2
+from PIL import Image
 
+import torch
 from torch.utils.data import Dataset
 
 logger = logging.getLogger(__name__)
@@ -42,21 +43,24 @@ logger = logging.getLogger(__name__)
     Keypoint Coord.:   kx1, ky1, ..., kx11, ky11  [pix]
 """
 class Park2019KRNDataset(Dataset):
-    def __init__(self, cfg, transforms=None, is_train=True, is_source=True):
-        self.is_train   = is_train
-        self.root       = osp.join(cfg.dataroot, cfg.dataname)
-        self.num_keypts = cfg.num_keypoints
+    def __init__(self, cfg, transforms=None, is_train=True, is_source=True, load_labels=True):
+        self.is_train    = is_train
+        self.load_labels = load_labels
+        self.root        = osp.join(cfg.dataroot, cfg.dataname)
+        self.num_keypts  = cfg.num_keypoints
 
         if is_train:
             if is_source:
                 # Source domain - train
                 csvfile = osp.join(self.root, cfg.train_domain,
                         'splits_'+cfg.model_name, cfg.train_csv)
+                assert load_labels
             else:
                 # Target domain - train for DANN
                 # Load test CSV with is_train=True
                 csvfile = osp.join(self.root, cfg.test_domain,
                         'splits_'+cfg.model_name, cfg.test_csv)
+                assert not load_labels
         else:
             csvfile = osp.join(self.root, cfg.test_domain,
                     'splits_'+cfg.model_name, cfg.test_csv)
@@ -79,25 +83,28 @@ class Park2019KRNDataset(Dataset):
 
         #------------ Read Images & Bbox
         imgpath = osp.join(self.root, self.csv.iloc[index, 0])
-        data    = cv2.imread(imgpath, cv2.IMREAD_COLOR)
-        data    = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
+        data    = Image.open(imgpath).convert('RGB')
         bbox    = np.array(self.csv.iloc[index, 1:5], dtype=np.float32)
+
+        #------------ Load keypoints
+        if self.is_train and self.load_labels:
+            keypts = np.array(self.csv.iloc[index, 12:], dtype=np.float32)  # [22,]
+            keypts = np.transpose(np.reshape(keypts, (self.num_keypts, 2))) # [2 x 11]
+        else:
+            keypts = np.zeros((2, self.num_keypts))
 
         #------------ Data transform
         if self.transforms is not None:
-            data, bbox = self.transforms(data, bbox)
+            data, bbox, keypts = self.transforms(data, bbox, keypts)
 
         #------------ Return keypoints (train) or pose (test)
         if self.is_train:
-            keypts = np.array(self.csv.iloc[index, 12:], dtype=np.float32)
-            keypts = np.reshape(keypts, (self.num_keypts, 2)) # (N, 2)
-
-            # adjust according to bbox
-            keypts[:,0] = (keypts[:,0] - bbox[0]) / (bbox[1] - bbox[0])
-            keypts[:,1] = (keypts[:,1] - bbox[2]) / (bbox[3] - bbox[2])
-            return data, keypts
+            if self.load_labels:
+                return data, keypts
+            else:
+                return data
         else:
             q_gt = np.array(self.csv.iloc[index, 5:9],  dtype=np.float32)
             t_gt = np.array(self.csv.iloc[index, 9:12], dtype=np.float32)
-            return data, bbox, q_gt, t_gt
+            return data, bbox, torch.from_numpy(q_gt), torch.from_numpy(t_gt)
 

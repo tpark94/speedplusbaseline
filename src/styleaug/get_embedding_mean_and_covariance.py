@@ -14,7 +14,8 @@ from torchvision.datasets import ImageFolder
 from torchvision.transforms import Compose, Resize, ToTensor
 from tqdm import tqdm
 
-''' Run below to get SPEED+ synthetic embedding
+''' Run below to get SPEED+ synthetic embedding (configured for HigherHRNet)
+
 python src/styleaug/get_embedding_mean_and_covariance.py \
     --data_dir /home/jeffpark/SLAB/Dataset/speedplus/synthetic/images/ \
     --batchsize 16 --input_size (480,320) \

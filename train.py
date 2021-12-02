@@ -34,7 +34,7 @@ import json
 import logging
 from scipy.io import loadmat
 
-from cfgs.config import cfg
+from config import cfg
 from src.styleaug.styleAugmentor import StyleAugmentor
 from src.nets.build     import get_model, get_optimizer
 from src.datasets.build import make_dataloader
@@ -49,11 +49,12 @@ logger = logging.getLogger(__name__)
 def main():
     device = torch.device('cuda:0') if torch.cuda.is_available() and cfg.use_cuda else torch.device('cpu')
 
-    # Seeds
-    set_all_seeds(2021, cfg, True)
-
     # Logger
     setup_logger('train')
+
+    # Seeds
+    logger.info('Random seed value: {}'.format(cfg.seed))
+    set_all_seeds(cfg.seed, cfg, True)
 
     # Save directory
     if not osp.exists(cfg.savedir): os.makedirs(cfg.savedir)
@@ -114,8 +115,8 @@ def main():
     # Miscellaneous items
     corners3D = load_tango_3d_keypoints(cfg.keypts_3d_model)
     cameraMatrix, distCoeffs = load_camera_intrinsics(
-                osp.join(cfg.dataroot, 'camera.json'))
-    attClasses = loadmat('src/utils/attitudeClasses.mat')['qClass'] # [Nclasses x 4]
+                osp.join(cfg.dataroot, cfg.dataname, 'camera.json'))
+    attClasses = loadmat(cfg.attitude_class)['qClass'] # [Nclasses x 4]
     assert attClasses.shape[0] == cfg.num_classes, 'Number of classes not matching.'
 
     # Main loop
@@ -132,11 +133,11 @@ def main():
 
         # Test
         if (epoch+1) % cfg.test_epoch == 0 and cfg.test_epoch > 0:
-            _, _, speed, _ = eval('valid_'+cfg.model_name)(
+            eval('valid_'+cfg.model_name)(
                 epoch+1, cfg, model, test_loader,
                 cameraMatrix, distCoeffs, corners3D, writer, device, attClasses)
 
-        # Best yet?
+        # Save best models every epoch
         perf = epoch+1
         if perf > best_perf:
             best_perf = perf

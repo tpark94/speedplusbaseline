@@ -30,18 +30,16 @@ matplotlib.use("TkAgg")
 from matplotlib import pyplot as plt
 from matplotlib import patches as patches
 
-import cv2
-import numpy as np
-
-def to_numpy_image(image):
+def _to_numpy_image(image):
     return image.mul(255).clamp(0,255).permute(1,2,0).byte().cpu().numpy()
 
 def imshow(image, savefn=None):
-    # image: torch.tensor (3 x H x W)
-
-    # image to numpy.array
-    image = to_numpy_image(image)
-    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+    ''' Show image
+    Arguments:
+        image: (3,H,W) torch.tensor image
+    '''
+    # image to numpy array
+    image = _to_numpy_image(image)
 
     # plot
     plt.imshow(image)
@@ -50,11 +48,16 @@ def imshow(image, savefn=None):
     if savefn is not None:
         plt.savefig(savefn, bbox_inches='tight', pad_inches=0)
 
-def plot_2D_bbox(tensor, bbox, xywh=True):
-    # bbox: [xmin, xmax, ymin, ymax]
-
+def plot_2D_bbox(image, bbox, xywh=True):
+    ''' Show image with a bounding box
+    Arguments:
+        image: (3,H,W) torch.tensor image
+        bbox:  (4,) numpy.ndarray bounding box
+        xywh:  If True,  bounding box is in [xcenter, ycenter, width, height]
+               If False, bounding box is in [xmin, xmax, ymin, ymax]
+    '''
     # Processing
-    data = to_numpy_image(tensor)
+    data = _to_numpy_image(image)
 
     if xywh:
         x, y, w, h = bbox
@@ -65,15 +68,21 @@ def plot_2D_bbox(tensor, bbox, xywh=True):
     # figure
     fig = plt.figure()
     plt.imshow(data)
-    plt.plot([xmin, xmax, xmax, xmin, xmin], [ymin, ymin, ymax, ymax, ymin], 
+    plt.plot([xmin, xmax, xmax, xmin, xmin], [ymin, ymin, ymax, ymax, ymin],
                 color='g', linewidth=1.5)
     plt.show()
 
-def scatter_keypoints(tensor, x_pr, y_pr, normalized=False):
-    # Tensor:     C x H x W
-    # Keypoints : Nc x 2
-    _, h, w = tensor.shape
-    data  = to_numpy_image(tensor)
+def scatter_keypoints(image, x_pr, y_pr, normalized=False):
+    ''' Show image with keypoints
+    Arguments:
+        image: (3,H,W) torch.tensor image
+        x_pr:  (11,) numpy.ndarray
+        y_pr:  (11,) numpy.ndarray
+        normalized: True if keypoints are normalized w.r.t. image size
+                    False if keypoints are in pixels
+    '''
+    _, h, w = image.shape
+    data  = _to_numpy_image(image)
 
     if normalized:
         x_pr = x_pr * w

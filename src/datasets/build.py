@@ -31,18 +31,18 @@ from .Park2019KRNDataset import Park2019KRNDataset
 from .SPNDataset         import SPNDataset
 from .transforms         import build_transforms
 
-def build_dataset(cfg, is_train=True, is_source=True):
+def build_dataset(cfg, is_train=True, is_source=True, load_labels=True):
 
     transforms = build_transforms(cfg.model_name, cfg.input_shape, is_train=is_train)
 
     if cfg.model_name == 'krn':
-        dataset = Park2019KRNDataset(cfg, transforms, is_train, is_source)
+        dataset = Park2019KRNDataset(cfg, transforms, is_train, is_source, load_labels)
     elif cfg.model_name == 'spn':
         dataset = SPNDataset(cfg, transforms, is_train, is_source)
 
     return dataset
 
-def make_dataloader(cfg, is_train=True, is_source=True):
+def make_dataloader(cfg, is_train=True, is_source=True, load_labels=True):
     if is_train:
         images_per_gpu = cfg.batch_size
         shuffle = True
@@ -50,9 +50,9 @@ def make_dataloader(cfg, is_train=True, is_source=True):
     else:
         images_per_gpu = 1
         shuffle = False
-        num_workers = 0
+        num_workers = 1
 
-    dataset = build_dataset(cfg, is_train, is_source)
+    dataset = build_dataset(cfg, is_train, is_source, load_labels)
 
     data_loader = torch.utils.data.DataLoader(
         dataset,
@@ -60,7 +60,7 @@ def make_dataloader(cfg, is_train=True, is_source=True):
         shuffle=shuffle,
         num_workers=num_workers,
         pin_memory=True,
-        drop_last=cfg.dann # drop last if DANN
+        drop_last=True
     )
 
     return data_loader

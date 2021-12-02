@@ -130,13 +130,12 @@ dmypy.json
 .pyre/
 
 # Project directories
-checkpoints/
-log/
-figures/
+/checkpoints/
+/log/
+/figures/
 
 # 3D model
-src/utils/tangoPoints.mat
-src/utils/attitudeClasses.mat
+/src/utils/tangoPoints.mat
 
 # Temporary
 matlab/

@@ -32,12 +32,12 @@ import os
 import os.path as osp
 import json
 import logging
-from scipy.io import loadmat
 
-from cfgs.config import cfg
+from config import cfg
 from src.nets.build     import get_model, get_optimizer
 from src.datasets.build import make_dataloader
 from src.core.dann      import train_dann_single_epoch_krn
+from src.core.inference import valid_krn
 from src.utils.utils    import setup_logger, set_all_seeds, \
                                save_checkpoint, load_checkpoint, \
                                load_tango_3d_keypoints, load_camera_intrinsics
@@ -76,6 +76,11 @@ def main():
     # Optimizer
     optimizer = get_optimizer(cfg, model)
 
+    # LR scheduler
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(
+        optimizer, step_size=cfg.lr_decay_step, gamma=cfg.lr_decay_alpha
+    )
+
     # Load checkpoint
     checkpoint_file = osp.join(cfg.savedir, 'checkpoint.pth.tar')
     if cfg.auto_resume and osp.exists(checkpoint_file):
@@ -89,50 +94,38 @@ def main():
         best_perf   = begin_epoch
 
     # Model to device
-    model = model.to(device)
+    model.to(device)
 
-    # Mixed-precision training?
-    # - Using PyTorch AMP package, requires PyTorch 1.6 or above
+    # No mixed-precision training for DANN
+    # (Requires some modification to GradientReversalLayer)
     scaler = None
-    if cfg.fp16:
-        scaler = torch.cuda.amp.GradScaler()
-        logger.info('Mixed-precision training enabled')
-
-    # LR scheduler
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(
-        optimizer, step_size=cfg.lr_decay_step, gamma=cfg.lr_decay_alpha
-    )
 
     # Dataloader
-    source_train_loader = make_dataloader(cfg, is_train=True,  is_source=True)
-    target_train_loader = make_dataloader(cfg, is_train=True,  is_source=False)
-    target_test_loader  = make_dataloader(cfg, is_train=False, is_source=False)
+    source_train_loader = make_dataloader(cfg, is_train=True,  is_source=True,  load_labels=True)
+    target_train_loader = make_dataloader(cfg, is_train=True,  is_source=False, load_labels=False)
+    target_test_loader  = make_dataloader(cfg, is_train=False, is_source=False, load_labels=True)
 
     # PnP-related items
     corners3D = load_tango_3d_keypoints(cfg.keypts_3d_model)
     cameraMatrix, distCoeffs = load_camera_intrinsics(
-                osp.join(cfg.dataroot, 'camera.json'))
-
+                osp.join(cfg.dataroot, cfg.dataname, 'camera.json'))
 
     # Main loop
-    perf    = 1e10
-    is_best = False
     for epoch in range(begin_epoch, cfg.max_epochs):
         # Train an epoch
-        eval('train_dann_single_epoch_'+cfg.model_name)(
+        train_dann_single_epoch_krn(
                 epoch, cfg, model, source_train_loader, target_train_loader,
-                optimizer, writer, device, scaler=scaler)
+                optimizer, writer, device)
 
         # Update LR scheduler
         lr_scheduler.step()
 
         # Test
         if (epoch+1) % cfg.test_epoch == 0 and cfg.test_epoch > 0:
-            _, _, speed, _ = eval('valid_'+cfg.model_name)(
-                epoch, cfg, model, target_test_loader,
-                cameraMatrix, distCoeffs, corners3D, writer, device, None)
+            valid_krn(epoch, cfg, model, target_test_loader,
+                      cameraMatrix, distCoeffs, corners3D, writer, device, None)
 
-        # Best yet?
+        # Save best models every epoch
         perf = epoch+1
         if perf > best_perf:
             best_perf = perf

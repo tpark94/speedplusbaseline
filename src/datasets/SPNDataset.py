@@ -29,7 +29,9 @@ import os.path as osp
 import logging
 import numpy as np
 import pandas as pd
-import cv2
+from PIL import Image
+
+import torch
 
 from torch.utils.data import Dataset
 
@@ -38,20 +40,14 @@ logger = logging.getLogger(__name__)
 class SPNDataset(Dataset):
     def __init__(self, cfg, transforms=None, is_train=True, is_source=True):
         self.is_train      = is_train
-        self.root          = cfg.dataroot
+        self.root          = osp.join(cfg.dataroot, cfg.dataname)
         self.num_classes   = cfg.num_classes
         self.num_neighbors = cfg.num_neighbors
 
-        if is_train:
-            if is_source:
-                # Source domain - train
-                csvfile = osp.join(self.root, cfg.train_domain,
-                        'splits_'+cfg.model_name, cfg.train_csv)
-            else:
-                # Target domain - train for DANN
-                # Load test CSV with is_train=True
-                csvfile = osp.join(self.root, cfg.test_domain,
-                        'splits_'+cfg.model_name, cfg.test_csv)
+        if is_train and is_source:
+            # Source domain - train
+            csvfile = osp.join(self.root, cfg.train_domain,
+                    'splits_'+cfg.model_name, cfg.train_csv)
         else:
             csvfile = osp.join(self.root, cfg.test_domain,
                     'splits_'+cfg.model_name, cfg.test_csv)
@@ -74,13 +70,13 @@ class SPNDataset(Dataset):
 
         #------------ Read Image & Bbox
         imgpath = osp.join(self.root, self.csv.iloc[index, 0])
-        data    = cv2.imread(imgpath, cv2.IMREAD_COLOR)
-        data    = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
+        data    = Image.open(imgpath).convert('RGB')
         bbox    = np.array(self.csv.iloc[index, 1:5], dtype=np.float32)
+        keypts  = np.zeros((2, 11)) # dummy
 
         #------------ Data transform
         if self.transforms is not None:
-            data, bbox = self.transforms(data, bbox)
+            data, bbox, _ = self.transforms(data, bbox, keypts)
 
         #------------ Return classes & weights (train) or pose (test)
         if self.is_train:
@@ -95,8 +91,8 @@ class SPNDataset(Dataset):
             yWeights = np.zeros(self.num_classes, dtype=np.float32)
             yWeights[attClasses] = attWeights
 
-            return data, yClasses, yWeights
+            return data, torch.from_numpy(yClasses), torch.from_numpy(yWeights)
         else:
             q_gt = np.array(self.csv.iloc[index, 5:9],  dtype=np.float32)
             t_gt = np.array(self.csv.iloc[index, 9:12], dtype=np.float32)
-            return data, bbox, q_gt, t_gt
+            return data, bbox, torch.from_numpy(q_gt), torch.from_numpy(t_gt)

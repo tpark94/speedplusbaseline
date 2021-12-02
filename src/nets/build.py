@@ -49,7 +49,7 @@ def get_model(cfg):
             logger.info('SPN created')
     else:
         # DANN
-        model = RevGrad(cfg)
+        model = RevGrad(cfg.num_keypoints)
         logger.info('RevGrad created with {}'.format(cfg.model_name))
 
     logger.info('   - Number of total parameters:     {:,}'.format(num_total_parameters(model)))
