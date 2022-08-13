@@ -1,12 +1,13 @@
 # SPEED+: Next-Generation Dataset for Spacecraft Pose Estimation across Domain Gap
 
-This repository is developed by Tae Ha "Jeff" Park at [Space Rendezvous Laboratory (SLAB)](slab.stanford.edu) of Stanford University.
+This repository is developed by Tae Ha "Jeff" Park at [Space Rendezvous Laboratory (SLAB)](https://slab.stanford.edu) of Stanford University.
 
 - [2021.12.02] Our paper will be presented at the 2022 IEEE Aerospace Conference! This repository is updated for our latest draft which will soon become available in arXiv.
+- [2022.08.13] README update.
 
 ## Introduction
 
-This is the official repository of the baseline studies conducted in our paper titled [SPEED+: Next-Generation Dataset for Spacecraft Pose Estimation across Domain Gap](https://arxiv.org/abs/2110.03101). It consists of the official PyTorch implementations of the following CNN models:
+This is the official repository of the baseline studies conducted in our paper titled [SPEED+: Next-Generation Dataset for Spacecraft Pose Estimation across Domain Gap](https://ieeexplore.ieee.org/document/9843439). It consists of the official PyTorch implementations of the following CNN models:
 
 - Keypoint Regression Network (KRN) [[arXiv](https://arxiv.org/abs/1909.00392)]
 - Spacecraft Pose Network (SPN) [[arXiv](https://arxiv.org/abs/1906.09868)]
@@ -18,7 +19,7 @@ The implementation of the SPN model follows from the original work by Sumant Sha
 
 ## Currently Unavailable Features
 
-The SPEED+ dataset is currently released and used for the [Satellite Pose Estimation Competition (SPEC2021)](https://kelvins.esa.int/pose-estimation-2021/). The competition is planned to last until the end of March 2022. In fairness of the competition, some items that are necessary to reproduce our results will not be available until at least the competition concludes. These include:
+The SPEED+ dataset is currently released and used for the [Satellite Pose Estimation Competition (SPEC2021)](https://kelvins.esa.int/pose-estimation-2021/). Following the end of SPEC2021, a post-mortem version is currently on-going. In fairness of the competition, some items that are necessary to reproduce our results are not available at this stage. These include:
 
 - Keypoints data used to train KRN (`src/utils/tangoPoints.mat`)
 - CSV files containing bounding box and keypoint labels (KRN) or spacecraft attitude classes (SPN) for all domains of SPEED+
@@ -123,11 +124,13 @@ The SPEED+ basline studies repository is released under the MIT License.
 
 If you find this repository and the SPEED+ dataset helpful in your research, please cite the paper below along with the dataset itself.
 ```
-@article{park2021speedplus,
-        title={{SPEED}+: Next-Generation Dataset for Spacecraft Pose Estimation across Domain Gap},
-        author={Park, Tae Ha and M{\"a}rtens, Marcus and Lecuyer, Gurvan and Izzo, Dario and D'Amico, Simone},
-        journal={arXiv preprint arXiv:2110.03101},
-        year={2021},
+@inproceedings{park2022speedplus,
+  author={Park, Tae Ha and M{\"a}rtens, Marcus and Lecuyer, Gurvan and Izzo, Dario and D'Amico, Simone},
+  booktitle={2022 IEEE Aerospace Conference (AERO)},
+  title={SPEED+: Next-Generation Dataset for Spacecraft Pose Estimation across Domain Gap},
+  year={2022},
+  pages={1-15},
+  doi={10.1109/AERO53065.2022.9843439}
 }
 ```
 
