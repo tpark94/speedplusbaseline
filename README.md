@@ -3,7 +3,8 @@
 This repository is developed by Tae Ha "Jeff" Park at [Space Rendezvous Laboratory (SLAB)](https://slab.stanford.edu) of Stanford University.
 
 - [2021.12.02] Our paper will be presented at the 2022 IEEE Aerospace Conference! This repository is updated for our latest draft which will soon become available in arXiv.
-- [2022.08.13] README update.
+- [2022.08.13] Citation update.
+- [2022.10.12] As announced on the [Kelvins website](https://kelvins.esa.int/pose-estimation-2021/discussion/90/), the post-mortem competition will terminate on 2022/12/31, followed by the full release of the lightbox and sunlamp labels on 2023/01/01. This repository will be updated shortly afterwards to reflect the new availability of the test labels.
 
 ## Introduction
 
