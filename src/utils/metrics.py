@@ -53,10 +53,13 @@ def speed_score(t_pr, q_pr, t_gt, q_gt, applyThresh=True, rotThresh=0.5, posThre
     speed_r = np.deg2rad(err_q)
 
     # Check if within threshold
-    if applyThresh and err_q < rotThresh and speed_t < posThresh:
-        speed = 0.0
-    else:
-        speed = speed_t + speed_r
+    if applyThresh and err_q < rotThresh:
+        speed_q = 0.0
+
+    if applyThresh and speed_t < posThresh:
+        speed_t = 0.0
+
+    speed = speed_t + speed_q
 
     # Accuracy of within threshold
     acc   = float(err_q < rotThresh and speed_t < posThresh)

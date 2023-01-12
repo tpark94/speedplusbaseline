@@ -139,4 +139,5 @@ dmypy.json
 
 # Temporary
 matlab/
+/misc/
 *.sh

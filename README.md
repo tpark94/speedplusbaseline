@@ -5,6 +5,7 @@ This repository is developed by Tae Ha "Jeff" Park at [Space Rendezvous Laborato
 - [2021.12.02] Our paper will be presented at the 2022 IEEE Aerospace Conference! This repository is updated for our latest draft which will soon become available in arXiv.
 - [2022.08.13] Citation update.
 - [2022.10.12] As announced on the [Kelvins website](https://kelvins.esa.int/pose-estimation-2021/discussion/90/), the post-mortem competition will terminate on 2022/12/31, followed by the full release of the lightbox and sunlamp labels on 2023/01/01. This repository will be updated shortly afterwards to reflect the new availability of the test labels.
+- [2023.01.12] The lightbox and sunlamp domain test labels are now available through [Stanford Digital Repository](https://purl.stanford.edu/wv398fc4383)! The metrics for HIL domains are also slightly modified to be in agreement with our [new paper](https://www.sciencedirect.com/science/article/pii/S0094576523000048) summarizing the competition.
 
 ## Introduction
 
@@ -17,15 +18,6 @@ The implementation of the SPN model follows from the original work by Sumant Sha
 
 - Domain randomization via style augmentation introduced in [Style Augmentation: Data Augmentation via Style Randomization](https://openaccess.thecvf.com/content_CVPRW_2019/papers/Deep%20Vision%20Workshop/Jackson_Style_Augmentation_Data_Augmentation_via_Style_Randomization_CVPRW_2019_paper.pdf) by Jackson et al. (2019). The implementation derives from the [official GitHub repository](https://github.com/philipjackson/style-augmentation).
 - Domain adaptation via DANN introduced in [Domain-Adversarial Training of Neural Networks](https://jmlr.org/papers/volume17/15-239/15-239.pdf) by Ganin et al. The implementation of Gradient Reversal Layer derives from the following [GitHub repository](https://github.com/jvanvugt/pytorch-domain-adaptation).
-
-## Currently Unavailable Features
-
-The SPEED+ dataset is currently released and used for the [Satellite Pose Estimation Competition (SPEC2021)](https://kelvins.esa.int/pose-estimation-2021/). Following the end of SPEC2021, a post-mortem version is currently on-going. In fairness of the competition, some items that are necessary to reproduce our results are not available at this stage. These include:
-
-- Keypoints data used to train KRN (`src/utils/tangoPoints.mat`)
-- CSV files containing bounding box and keypoint labels (KRN) or spacecraft attitude classes (SPN) for all domains of SPEED+
-
-However, you can still create your own data to generate CSV files and train/test the models.
 
 ## Installation
 
@@ -49,7 +41,7 @@ pip install -r requirements.txt
 
 ## Pre-processing
 
-1. First, recover 11 keypoints as described in this [paper](https://arxiv.org/abs/1909.00392). The order of keypoints does not matter as long as you are consistent with them. Save it as [3 x 11] array under the variable named `tango3Dpoints` and save it under `src/utils/tangoPoints.mat`. If you choose to save it elsewhere, make sure to specify its location w.r.t. `$PROJROOT` at `--keypts_3d_model` in `config.py`.
+1. First, recover 11 keypoints as described in this [paper](https://arxiv.org/abs/1909.00392). The order of keypoints does not matter as long as you are consistent with them. Save it as [3 x 11] array under the variable named `tango3Dpoints` and save it under `src/utils/tangoPoints.mat`. If you choose to save it elsewhere, make sure to specify its location w.r.t. `$PROJROOT` at `--keypts_3d_model` in `config.py`. Please note that we will *not* be releasing the keypoints.
 
 2. For SPN, the attitude classes are provided at `src/utils/attitudeClasses.mat`.
 
@@ -113,10 +105,11 @@ python adapt.py --savedir 'checkpoints/krn/dann_lightbox' \
                 --optimizer 'adamw' --lr 0.001 \
                 --weight_decay 0.01 --lr_decay_alpha 0.95 --lr_decay_step 10 \
                 --train_domain 'synthetic' --test_domain 'lightbox' \
-                --train_csv 'train.csv' --test_csv 'lightbox.csv' \
+                --train_csv 'train.csv' --test_csv 'test.csv' \
                 --perform_dann
 ```
-which currently assumes `lightbox.csv` is available with test labels for occasional validation. (You can comment out relevant parts in `adapt.py` to not run testing at all.)
+which currently assumes that `test.csv` for the lightbox domain is available with test labels for occasional validation. (You can comment out relevant parts in `adapt.py` to not run testing at all.)
+
 ## License
 
 The SPEED+ basline studies repository is released under the MIT License.
