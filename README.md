@@ -6,6 +6,7 @@ This repository is developed by Tae Ha "Jeff" Park at [Space Rendezvous Laborato
 - [2022.08.13] Citation update.
 - [2022.10.12] As announced on the [Kelvins website](https://kelvins.esa.int/pose-estimation-2021/discussion/90/), the post-mortem competition will terminate on 2022/12/31, followed by the full release of the lightbox and sunlamp labels on 2023/01/01. This repository will be updated shortly afterwards to reflect the new availability of the test labels.
 - [2023.01.12] The lightbox and sunlamp domain test labels are now available through [Stanford Digital Repository](https://purl.stanford.edu/wv398fc4383)! The metrics for HIL domains are also slightly modified to be in agreement with our [new paper](https://www.sciencedirect.com/science/article/pii/S0094576523000048) summarizing the competition.
+- [2023.11.03] We are sharing the `tangoPoints.mat` file under `src/utils`.
 
 ## Introduction
 
